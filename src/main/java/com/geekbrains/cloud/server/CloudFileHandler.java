@@ -14,7 +14,8 @@ public class CloudFileHandler implements Runnable {
     private final DataInputStream is;
     private final DataOutputStream os;
     private final byte[] buf;
-    private File serverDirectory;
+    private final File serverDirectory;
+    private final File currentDirectory;
 
     public CloudFileHandler(Socket socket) throws IOException {
         System.out.println("Client connected!");
@@ -22,6 +23,7 @@ public class CloudFileHandler implements Runnable {
         os = new DataOutputStream(socket.getOutputStream());
         buf = new byte[BUFFER_SIZE];
         serverDirectory = new File("server");
+        currentDirectory = new File(System.getProperty("user.home"));
     }
 
     @Override
@@ -42,6 +44,19 @@ public class CloudFileHandler implements Runnable {
                         }
                     }
                     System.out.println("File: " + name + " is uploaded");
+                } else if ("#file_download#".equals(command)) {
+                    String name = is.readUTF();
+                    long size = is.readLong();
+                    File newFile = currentDirectory.toPath()
+                            .resolve(name)
+                            .toFile();
+                    try (OutputStream fos = new FileOutputStream(newFile)) {
+                        for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                            int readCount = is.read(buf);
+                            fos.write(buf, 0, readCount);
+                        }
+                    }
+                    System.out.println("File: " + name + " is downloaded");
                 } else {
                     System.err.println("Unknown command: " + command);
                 }
