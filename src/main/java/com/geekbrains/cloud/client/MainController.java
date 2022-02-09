@@ -25,6 +25,7 @@ public class MainController implements Initializable {
     public ListView<String> clientView;
     public ListView<String> serverView;
     private File currentDirectory;
+    private File serverDirectory;
 
     private DataInputStream is;
     private DataOutputStream os;
@@ -41,8 +42,32 @@ public class MainController implements Initializable {
         });
     }
 
-    public void download(ActionEvent actionEvent) {
+    private void updateServerView() {
+        Platform.runLater(() -> {
+            serverPath.setText(serverDirectory.getPath());
+            serverView.getItems().clear();
+            serverView.getItems().add("...");
+            serverView.getItems()
+                    .addAll(serverDirectory.list());
+        });
+    }
 
+    public void download(ActionEvent actionEvent) throws IOException {
+        String item = serverView.getSelectionModel().getSelectedItem();
+        File selected = serverDirectory.toPath().resolve(item).toFile();
+        if (selected.isFile()) {
+            os.writeUTF("#file_download#");
+            os.writeUTF(selected.getName());
+            os.writeLong(selected.length());
+            try (InputStream fis = new FileInputStream(selected)) {
+                while (fis.available() > 0) {
+                    int readBytes = fis.read(buf);
+                    os.write(buf, 0, readBytes);
+                }
+            }
+            os.flush();
+            updateClientView();
+        }
     }
 
     // upload file to server
@@ -60,6 +85,7 @@ public class MainController implements Initializable {
                 }
             }
             os.flush();
+            updateServerView();
         }
     }
 
@@ -77,12 +103,15 @@ public class MainController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         currentDirectory = new File(System.getProperty("user.home"));
-
+        serverDirectory = new File("server");
 
         // run in FX Thread
         // :: - method reference
         updateClientView();
+        updateServerView();
+
         initNetwork();
+
         clientView.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 String item = clientView.getSelectionModel().getSelectedItem();
@@ -94,6 +123,22 @@ public class MainController implements Initializable {
                     if (selected.isDirectory()) {
                         currentDirectory = selected;
                         updateClientView();
+                    }
+                }
+            }
+        });
+
+        serverView.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                String item = serverView.getSelectionModel().getSelectedItem();
+                if (item.equals("...")) {
+                    serverDirectory = serverDirectory.getParentFile();
+                    updateServerView();
+                } else {
+                    File selected = serverDirectory.toPath().resolve(item).toFile();
+                    if (selected.isDirectory()) {
+                        serverDirectory = selected;
+                        updateServerView();
                     }
                 }
             }
