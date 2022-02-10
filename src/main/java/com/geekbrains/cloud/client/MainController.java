@@ -1,11 +1,6 @@
 package com.geekbrains.cloud.client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.Socket;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -14,7 +9,9 @@ import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
 import javafx.scene.control.ListView;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
+import sun.font.FontRunIterator;
 
 public class MainController implements Initializable {
 
@@ -25,10 +22,13 @@ public class MainController implements Initializable {
     public ListView<String> clientView;
     public ListView<String> serverView;
     private File currentDirectory;
+    private File serverDirectory;
 
     private DataInputStream is;
     private DataOutputStream os;
     private byte[] buf;
+
+    private boolean delete = false;
 
     // Platform.runLater(() -> {})
     private void updateClientView() {
@@ -41,8 +41,40 @@ public class MainController implements Initializable {
         });
     }
 
-    public void download(ActionEvent actionEvent) {
+    // Platform.runLater(() -> {})
+    private void updateServerView() {
+        Platform.runLater(() -> {
+            serverView.getItems().clear();
+            try {
+                os.writeUTF("#serverDirectory_message#");
+                int size = is.readInt();
+                serverPath.setText(is.readUTF());
+                for (int i = 0; i < size; i++) {
+                    serverView.getItems().add(is.readUTF());
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+    }
 
+    // download file to client
+    public void download(ActionEvent actionEvent) throws IOException {
+        String name = serverView.getSelectionModel().getSelectedItem();
+        os.writeUTF("#fileDown_message#");
+        os.writeBoolean(delete);
+        os.writeUTF(name);
+        os.flush();
+        long size = is.readLong();
+        File newFile = currentDirectory.toPath().resolve(name).toFile();
+        try (OutputStream fos = new FileOutputStream(newFile)) {
+            for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                int readCount = is.read(buf);
+                fos.write(buf, 0, readCount);
+            }
+        }
+        updateServerView();
+        updateClientView();
     }
 
     // upload file to server
@@ -61,6 +93,26 @@ public class MainController implements Initializable {
             }
             os.flush();
         }
+        deleteFile(selected, item);
+        updateServerView();
+        updateClientView();
+
+    }
+
+    public void RadioButtonDeleteFile(ActionEvent actionEvent) throws IOException {
+        if (!delete) {
+            delete = true;
+        } else {
+            delete = false;
+        }
+        os.flush();
+    }
+
+    public void deleteFile (File file, String name){
+        if (delete) {
+            if(file.delete()){
+                System.out.println("File: " + name + " delete");}
+        }
     }
 
     private void initNetwork() {
@@ -77,12 +129,11 @@ public class MainController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         currentDirectory = new File(System.getProperty("user.home"));
-
-
         // run in FX Thread
         // :: - method reference
         updateClientView();
         initNetwork();
+        updateServerView();
         clientView.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 String item = clientView.getSelectionModel().getSelectedItem();
@@ -99,4 +150,6 @@ public class MainController implements Initializable {
             }
         });
     }
+
+
 }
