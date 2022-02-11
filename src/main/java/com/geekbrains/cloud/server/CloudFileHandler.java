@@ -63,8 +63,8 @@ public class CloudFileHandler implements Runnable {
                             }
                         }
                         os.flush();
+                        deleteFile(selected, name);
                     }
-                    deleteFile(selected, name);
                     System.out.println("File: " + name + " is download");
                 } else if ("#serverDirectory_message#".equals(command)) {
                     os.writeInt(serverDirectory.list().length);

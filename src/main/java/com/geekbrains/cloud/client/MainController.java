@@ -8,9 +8,7 @@ import java.util.ResourceBundle;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
-import javafx.scene.control.ListView;
-import javafx.scene.control.RadioButton;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import sun.font.FontRunIterator;
 
 public class MainController implements Initializable {
@@ -24,11 +22,35 @@ public class MainController implements Initializable {
     private File currentDirectory;
     private File serverDirectory;
 
+
     private DataInputStream is;
     private DataOutputStream os;
     private byte[] buf;
 
     private boolean delete = false;
+
+    public Button buttonDuwn;
+    public Button buttonUp;
+    public RadioButton buttonRadio;
+
+    private Boolean chekSelectedView(ListView<String> view) { // если файл не выделен возвращает false
+        return !view.getSelectionModel().isEmpty();
+    }
+
+    private void alert(String title, String meseg) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(meseg);
+        alert.showAndWait();
+    }
+
+
+    private void buttonOnOff(Boolean bool) {
+        buttonDuwn.setDisable(!bool);
+        buttonUp.setDisable(!bool);
+        buttonRadio.setDisable(!bool);
+    }
 
     // Platform.runLater(() -> {})
     private void updateClientView() {
@@ -59,59 +81,72 @@ public class MainController implements Initializable {
     }
 
     // download file to client
+
+
     public void download(ActionEvent actionEvent) throws IOException {
-        String name = serverView.getSelectionModel().getSelectedItem();
-        os.writeUTF("#fileDown_message#");
-        os.writeBoolean(delete);
-        os.writeUTF(name);
-        os.flush();
-        long size = is.readLong();
-        File newFile = currentDirectory.toPath().resolve(name).toFile();
-        try (OutputStream fos = new FileOutputStream(newFile)) {
-            for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
-                int readCount = is.read(buf);
-                fos.write(buf, 0, readCount);
+        if (chekSelectedView(serverView)) {
+            buttonOnOff(false);
+            String name = serverView.getSelectionModel().getSelectedItem();
+            os.writeUTF("#fileDown_message#");
+            os.writeBoolean(delete);
+            os.writeUTF(name);
+            os.flush();
+            long size = is.readLong();
+            File newFile = currentDirectory.toPath().resolve(name).toFile();
+            try (OutputStream fos = new FileOutputStream(newFile)) {
+                for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                    int readCount = is.read(buf);
+                    fos.write(buf, 0, readCount);
+                }
             }
+            updateServerView();
+            updateClientView();
+            buttonOnOff(true);
+        } else{
+            alert("Файл не выбран", "Выбери файл в списке справа!");
         }
-        updateServerView();
-        updateClientView();
     }
 
     // upload file to server
     public void upload(ActionEvent actionEvent) throws IOException {
-        String item = clientView.getSelectionModel().getSelectedItem();
-        File selected = currentDirectory.toPath().resolve(item).toFile();
-        if (selected.isFile()) {
-            os.writeUTF("#file_message#");
-            os.writeUTF(selected.getName());
-            os.writeLong(selected.length());
-            try (InputStream fis = new FileInputStream(selected)) {
-                while (fis.available() > 0) {
-                    int readBytes = fis.read(buf);
-                    os.write(buf, 0, readBytes);
+        if (chekSelectedView(clientView)) {
+            buttonOnOff(false);
+            String item = clientView.getSelectionModel().getSelectedItem();
+            File selected = currentDirectory.toPath().resolve(item).toFile();
+            if (selected.isFile()) {
+                os.writeUTF("#file_message#");
+                os.writeUTF(selected.getName());
+                os.writeLong(selected.length());
+                try (InputStream fis = new FileInputStream(selected)) {
+                    while (fis.available() > 0) {
+                        int readBytes = fis.read(buf);
+                        os.write(buf, 0, readBytes);
+                    }
                 }
+                os.flush();
+                deleteFile(selected, item);
             }
-            os.flush();
+            updateServerView();
+            updateClientView();
+            buttonOnOff(true);
+        }else{
+            alert("Файл не выбран", "Выбери файл в списке слева!");
         }
-        deleteFile(selected, item);
-        updateServerView();
-        updateClientView();
-
     }
 
-    public void RadioButtonDeleteFile(ActionEvent actionEvent) throws IOException {
+    public void radioButtonDeleteFile(ActionEvent actionEvent) throws IOException {
         if (!delete) {
             delete = true;
         } else {
             delete = false;
         }
-        os.flush();
     }
 
-    public void deleteFile (File file, String name){
+    public void deleteFile(File file, String name) {
         if (delete) {
-            if(file.delete()){
-                System.out.println("File: " + name + " delete");}
+            if (file.delete()) {
+                System.out.println("File: " + name + " delete");
+            }
         }
     }
 
