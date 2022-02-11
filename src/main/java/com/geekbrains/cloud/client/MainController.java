@@ -45,7 +45,6 @@ public class MainController implements Initializable {
         alert.showAndWait();
     }
 
-
     private void buttonOnOff(Boolean bool) {
         buttonDuwn.setDisable(!bool);
         buttonUp.setDisable(!bool);
@@ -81,8 +80,6 @@ public class MainController implements Initializable {
     }
 
     // download file to client
-
-
     public void download(ActionEvent actionEvent) throws IOException {
         if (chekSelectedView(serverView)) {
             buttonOnOff(false);
@@ -102,7 +99,10 @@ public class MainController implements Initializable {
             updateServerView();
             updateClientView();
             buttonOnOff(true);
-        } else{
+            Platform.runLater(() -> {
+            clientView.getSelectionModel().select(name);
+            });
+        } else {
             alert("Файл не выбран", "Выбери файл в списке справа!");
         }
     }
@@ -129,7 +129,10 @@ public class MainController implements Initializable {
             updateServerView();
             updateClientView();
             buttonOnOff(true);
-        }else{
+            Platform.runLater(() -> {
+                serverView.getSelectionModel().select(item);
+            });
+        } else {
             alert("Файл не выбран", "Выбери файл в списке слева!");
         }
     }
@@ -185,6 +188,4 @@ public class MainController implements Initializable {
             }
         });
     }
-
-
 }
