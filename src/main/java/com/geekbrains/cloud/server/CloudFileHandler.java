@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.Arrays;
 
 public class CloudFileHandler implements Runnable {
 
@@ -42,6 +43,19 @@ public class CloudFileHandler implements Runnable {
                         }
                     }
                     System.out.println("File: " + name + " is uploaded");
+                } else if ("#download_message#".equals(command)) {
+                    String name = is.readUTF();
+                    long size = is.readLong();
+                    File downloadFile = new File(is.readUTF()).toPath()
+                            .resolve(name)
+                            .toFile();
+                    try (OutputStream fos = new FileOutputStream(downloadFile)) {
+                        for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                            int readCount = is.read(buf);
+                            fos.write(buf, 0, readCount);
+                        }
+                    }
+                    System.out.println("File: " + name + " is downloaded");
                 } else {
                     System.err.println("Unknown command: " + command);
                 }
