@@ -1,11 +1,6 @@
 package com.geekbrains.cloud.client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.Socket;
 import java.net.URL;
 import java.util.ArrayList;
@@ -53,7 +48,13 @@ public class MainController implements Initializable {
     }
 
     public void download(ActionEvent actionEvent) {
-
+        String item = serverView.getSelectionModel().getSelectedItem();
+        try {
+            os.writeUTF(Commands.FILE_DOWNLOAD.getCommand());
+            os.writeUTF(item);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     // upload file to server
@@ -130,11 +131,25 @@ public class MainController implements Initializable {
                             list.add(s);
                         }
                         updateServerView(list);
+                    }else if(Commands.FILE_DOWNLOAD.getCommand().equals(s)){
+                        //получаем файл с сервера
+                        String name = is.readUTF();
+                        long size = is.readLong();
+                        File newFile = currentDirectory.toPath()
+                                .resolve(name)
+                                .toFile();
+                        try (OutputStream fos = new FileOutputStream(newFile)) {
+                            for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                                int readCount = is.read(buf);
+                                fos.write(buf, 0, readCount);
+                            }
+                        }
+                        System.out.println("File: " + name + " is uploaded");
+                        updateClientView();
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
     }
 }

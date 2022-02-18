@@ -2,12 +2,7 @@ package com.geekbrains.cloud.server;
 
 import com.geekbrains.cloud.Commands;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
@@ -43,6 +38,24 @@ public class CloudFileHandler implements Runnable {
 
     }
 
+    private  void sendFile(String file){
+        try {
+            os.writeUTF(Commands.FILE_DOWNLOAD.getCommand());
+            File selected = serverDirectory.toPath().resolve(file).toFile();
+            os.writeUTF(selected.getName());
+            os.writeLong(selected.length());
+            try (InputStream fis = new FileInputStream(selected)) {
+                while (fis.available() > 0) {
+                    int readBytes = fis.read(buf);
+                    os.write(buf, 0, readBytes);
+                }
+            }
+            os.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public void run() {
         try {
@@ -61,7 +74,13 @@ public class CloudFileHandler implements Runnable {
                         }
                     }
                     System.out.println("File: " + name + " is uploaded");
-                } else {
+                } else if ( Commands.FILE_DOWNLOAD.getCommand().equals(command)){
+                    String file = is.readUTF();
+                    //поверить, файл ли это
+                    //как отправить папку?? на клиенте создаем одноименную папку, а пересылаем ее содержимое с сервера?
+                    sendFile(file);
+                }
+                else {
                     System.err.println("Unknown command: " + command);
                 }
             }
