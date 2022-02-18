@@ -1,5 +1,7 @@
 package com.geekbrains.cloud.server;
 
+import com.geekbrains.cloud.Commands;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -7,6 +9,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.Arrays;
+import java.util.List;
 
 public class CloudFileHandler implements Runnable {
 
@@ -22,6 +26,21 @@ public class CloudFileHandler implements Runnable {
         os = new DataOutputStream(socket.getOutputStream());
         buf = new byte[BUFFER_SIZE];
         serverDirectory = new File("server");
+        sendFileList();//отправляем список файлов сервера на клиент при подключении клиента
+    }
+
+    private void sendFileList(){
+        List<String> filesList = Arrays.asList(serverDirectory.list());
+        try {
+            os.writeUTF(Commands.SERVER_FILES.getCommand());
+            os.writeInt(filesList.size());
+            for ( String file:filesList) {
+                os.writeUTF(file);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     @Override

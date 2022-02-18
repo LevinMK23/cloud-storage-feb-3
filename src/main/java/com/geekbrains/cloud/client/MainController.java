@@ -8,8 +8,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
+import com.geekbrains.cloud.Commands;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
@@ -26,6 +29,7 @@ public class MainController implements Initializable {
     public ListView<String> serverView;
     private File currentDirectory;
 
+
     private DataInputStream is;
     private DataOutputStream os;
     private byte[] buf;
@@ -38,6 +42,13 @@ public class MainController implements Initializable {
             clientView.getItems().add("...");
             clientView.getItems()
                     .addAll(currentDirectory.list());
+        });
+    }
+
+    private void updateServerView(List<String> list){
+        Platform.runLater(()->{
+            serverView.getItems().clear();
+            serverView.getItems().addAll(list);
         });
     }
 
@@ -78,7 +89,6 @@ public class MainController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         currentDirectory = new File(System.getProperty("user.home"));
 
-
         // run in FX Thread
         // :: - method reference
         updateClientView();
@@ -98,5 +108,33 @@ public class MainController implements Initializable {
                 }
             }
         });
+
+
+        //запустить новый поток, который считывает список файлов на сервере
+        new Thread(()->{
+            read();
+        }).start();
+
+    }
+
+    private void read(){
+        List<String> list = new ArrayList<>();
+            try {
+                while (true) {
+                    String s = is.readUTF();
+                    //список файлов сервера
+                    if( Commands.SERVER_FILES.getCommand().equals(s)){
+                        int count = is.readInt(); //количество файлов
+                        for(int i = 0; i < count; i++){
+                            s = is.readUTF();
+                            list.add(s);
+                        }
+                        updateServerView(list);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
     }
 }
