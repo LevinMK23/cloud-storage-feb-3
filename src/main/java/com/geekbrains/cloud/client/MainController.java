@@ -1,15 +1,13 @@
 package com.geekbrains.cloud.client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.Socket;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
+import com.geekbrains.cloud.Commands;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
@@ -26,6 +24,7 @@ public class MainController implements Initializable {
     public ListView<String> serverView;
     private File currentDirectory;
 
+
     private DataInputStream is;
     private DataOutputStream os;
     private byte[] buf;
@@ -41,8 +40,21 @@ public class MainController implements Initializable {
         });
     }
 
-    public void download(ActionEvent actionEvent) {
+    private void updateServerView(List<String> list){
+        Platform.runLater(()->{
+            serverView.getItems().clear();
+            serverView.getItems().addAll(list);
+        });
+    }
 
+    public void download(ActionEvent actionEvent) {
+        String item = serverView.getSelectionModel().getSelectedItem();
+        try {
+            os.writeUTF(Commands.FILE_DOWNLOAD.getCommand());
+            os.writeUTF(item);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     // upload file to server
@@ -78,7 +90,6 @@ public class MainController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         currentDirectory = new File(System.getProperty("user.home"));
 
-
         // run in FX Thread
         // :: - method reference
         updateClientView();
@@ -98,5 +109,47 @@ public class MainController implements Initializable {
                 }
             }
         });
+
+
+        //запустить новый поток, который считывает список файлов на сервере
+        new Thread(()->{
+            read();
+        }).start();
+
+    }
+
+    private void read(){
+        List<String> list = new ArrayList<>();
+            try {
+                while (true) {
+                    String s = is.readUTF();
+                    //список файлов сервера
+                    if( Commands.SERVER_FILES.getCommand().equals(s)){
+                        int count = is.readInt(); //количество файлов
+                        for(int i = 0; i < count; i++){
+                            s = is.readUTF();
+                            list.add(s);
+                        }
+                        updateServerView(list);
+                    }else if(Commands.FILE_DOWNLOAD.getCommand().equals(s)){
+                        //получаем файл с сервера
+                        String name = is.readUTF();
+                        long size = is.readLong();
+                        File newFile = currentDirectory.toPath()
+                                .resolve(name)
+                                .toFile();
+                        try (OutputStream fos = new FileOutputStream(newFile)) {
+                            for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                                int readCount = is.read(buf);
+                                fos.write(buf, 0, readCount);
+                            }
+                        }
+                        System.out.println("File: " + name + " is uploaded");
+                        updateClientView();
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
     }
 }

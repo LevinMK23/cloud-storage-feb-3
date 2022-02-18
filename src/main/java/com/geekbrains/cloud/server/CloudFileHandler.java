@@ -1,12 +1,11 @@
 package com.geekbrains.cloud.server;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import com.geekbrains.cloud.Commands;
+
+import java.io.*;
 import java.net.Socket;
+import java.util.Arrays;
+import java.util.List;
 
 public class CloudFileHandler implements Runnable {
 
@@ -22,6 +21,39 @@ public class CloudFileHandler implements Runnable {
         os = new DataOutputStream(socket.getOutputStream());
         buf = new byte[BUFFER_SIZE];
         serverDirectory = new File("server");
+        sendFileList();//отправляем список файлов сервера на клиент при подключении клиента
+    }
+
+    private void sendFileList(){
+        List<String> filesList = Arrays.asList(serverDirectory.list());
+        try {
+            os.writeUTF(Commands.SERVER_FILES.getCommand());
+            os.writeInt(filesList.size());
+            for ( String file:filesList) {
+                os.writeUTF(file);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private  void sendFile(String file){
+        try {
+            os.writeUTF(Commands.FILE_DOWNLOAD.getCommand());
+            File selected = serverDirectory.toPath().resolve(file).toFile();
+            os.writeUTF(selected.getName());
+            os.writeLong(selected.length());
+            try (InputStream fis = new FileInputStream(selected)) {
+                while (fis.available() > 0) {
+                    int readBytes = fis.read(buf);
+                    os.write(buf, 0, readBytes);
+                }
+            }
+            os.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -42,7 +74,13 @@ public class CloudFileHandler implements Runnable {
                         }
                     }
                     System.out.println("File: " + name + " is uploaded");
-                } else {
+                } else if ( Commands.FILE_DOWNLOAD.getCommand().equals(command)){
+                    String file = is.readUTF();
+                    //поверить, файл ли это
+                    //как отправить папку?? на клиенте создаем одноименную папку, а пересылаем ее содержимое с сервера?
+                    sendFile(file);
+                }
+                else {
                     System.err.println("Unknown command: " + command);
                 }
             }
