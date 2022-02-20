@@ -1,11 +1,6 @@
 package com.geekbrains.cloud.client;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.Socket;
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -41,8 +36,43 @@ public class MainController implements Initializable {
         });
     }
 
-    public void download(ActionEvent actionEvent) {
+    private void updateServerView(){
+        int numServFiles = 0;
+        serverView.getItems().clear();
+        try {
+            numServFiles = is.readInt();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        for (int i = 0; i < numServFiles; i++) {
+            try {
+                serverView.getItems().add(is.readUTF());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
+    }
+
+    public void download(ActionEvent actionEvent) {
+        String item = serverView.getSelectionModel().getSelectedItem();
+        try {
+            os.writeUTF("downloadToClient");
+            os.writeUTF(item);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        File newFile = currentDirectory.toPath().resolve(item).toFile();
+        try (OutputStream fos = new FileOutputStream(newFile)) {
+            long size = is.readLong();
+            for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                int readCount = is.read(buf);
+                fos.write(buf, 0, readCount);
+            }
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        updateClientView();
     }
 
     // upload file to server
@@ -60,6 +90,7 @@ public class MainController implements Initializable {
                 }
             }
             os.flush();
+            updateServerView();
         }
     }
 
@@ -83,6 +114,7 @@ public class MainController implements Initializable {
         // :: - method reference
         updateClientView();
         initNetwork();
+        updateServerView();
         clientView.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 String item = clientView.getSelectionModel().getSelectedItem();

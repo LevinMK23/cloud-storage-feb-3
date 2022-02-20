@@ -1,11 +1,6 @@
 package com.geekbrains.cloud.server;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.Socket;
 
 public class CloudFileHandler implements Runnable {
@@ -27,6 +22,7 @@ public class CloudFileHandler implements Runnable {
     @Override
     public void run() {
         try {
+                sendListServerFiles();
             while (true) {
                 String command = is.readUTF();
                 if ("#file_message#".equals(command)) {
@@ -42,7 +38,21 @@ public class CloudFileHandler implements Runnable {
                         }
                     }
                     System.out.println("File: " + name + " is uploaded");
-                } else {
+                    sendListServerFiles();
+                }
+                if ("downloadToClient".equals(command)){
+                    String item = is.readUTF();
+                    File fileToClient = serverDirectory.toPath().resolve(item).toFile();
+                    os.writeLong(fileToClient.length());
+                    try (InputStream fis = new FileInputStream(fileToClient)) {
+                        while (fis.available() > 0) {
+                            int readBytes = fis.read(buf);
+                            os.write(buf, 0, readBytes);
+                        }
+                    }
+                    os.flush();
+                }
+                    else {
                     System.err.println("Unknown command: " + command);
                 }
             }
@@ -51,4 +61,13 @@ public class CloudFileHandler implements Runnable {
         }
 
     }
+
+    public void sendListServerFiles() throws IOException {
+        String[] listServerFiles = serverDirectory.list();
+        os.writeInt(listServerFiles.length);
+        for (int i = 0; i < listServerFiles.length; i++) {
+            os.writeUTF(listServerFiles[i]);
+        }
+    }
+
 }
