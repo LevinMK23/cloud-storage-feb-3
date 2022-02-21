@@ -4,10 +4,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
 import javafx.application.Platform;
@@ -23,7 +27,10 @@ public class MainController implements Initializable {
     public TextField clientPath;
     public TextField serverPath;
     public ListView<String> clientView;
+
+    // данных нет на клиенте и не может быть!!!
     public ListView<String> serverView;
+
     private File currentDirectory;
 
     private DataInputStream is;
@@ -31,6 +38,7 @@ public class MainController implements Initializable {
     private byte[] buf;
 
     // Platform.runLater(() -> {})
+
     private void updateClientView() {
         Platform.runLater(() -> {
             clientPath.setText(currentDirectory.getAbsolutePath());
@@ -41,8 +49,19 @@ public class MainController implements Initializable {
         });
     }
 
-    public void download(ActionEvent actionEvent) {
+    private void updateServerView(List<String> names) {
+        Platform.runLater(() -> {
+            serverView.getItems().clear();
+            serverView.getItems().add("...");
+            serverView.getItems()
+                    .addAll(names);
+        });
+    }
 
+    public void download(ActionEvent actionEvent) throws IOException {
+        os.writeUTF("#get_file#");
+        os.writeUTF(serverView.getSelectionModel().getSelectedItem());
+        os.flush();
     }
 
     // upload file to server
@@ -63,12 +82,58 @@ public class MainController implements Initializable {
         }
     }
 
+    private void readFromInputStream() {
+        try {
+            while (true) {
+                String command = is.readUTF();
+                // #list# size name1 name2 ... name_size
+                // #path# pathName
+                // #path_action# dirName
+                // #progress# float_value
+                if ("#list#".equals(command)) {
+                    List<String> names = new ArrayList<>();
+                    int count = is.readInt();
+                    for (int i = 0; i < count; i++) {
+                        String name = is.readUTF();
+                        names.add(name);
+                    }
+                    updateServerView(names);
+                }
+                if ("#path#".equals(command)) {
+                    String serverDir = is.readUTF();
+                    Platform.runLater(() -> serverPath.setText(serverDir));
+                }
+                if ("#file_message#".equals(command)) {
+
+                    String name = is.readUTF();
+                    long size = is.readLong();
+                    File newFile = currentDirectory.toPath()
+                            .resolve(name)
+                            .toFile();
+                    try (OutputStream fos = new FileOutputStream(newFile)) {
+                        for (int i = 0; i < (size + BUFFER_SIZE - 1) / BUFFER_SIZE; i++) {
+                            int readCount = is.read(buf);
+                            fos.write(buf, 0, readCount);
+                        }
+                    }
+
+                    updateClientView();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private void initNetwork() {
         try {
             buf = new byte[BUFFER_SIZE];
             Socket socket = new Socket("localhost", 8189);
             is = new DataInputStream(socket.getInputStream());
             os = new DataOutputStream(socket.getOutputStream());
+            Thread readThread = new Thread(this::readFromInputStream);
+            readThread.setDaemon(true);
+            readThread.start();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -83,6 +148,8 @@ public class MainController implements Initializable {
         // :: - method reference
         updateClientView();
         initNetwork();
+
+
         clientView.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 String item = clientView.getSelectionModel().getSelectedItem();
