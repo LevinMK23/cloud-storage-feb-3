@@ -1,5 +1,6 @@
 package com.geekbrains.cloud.nio;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -8,6 +9,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -18,7 +20,7 @@ public class EchoServerNio {
     private ByteBuffer buf;
 
     public EchoServerNio() throws Exception {
-        buf = ByteBuffer.allocate(5);
+        buf = ByteBuffer.allocate(50);
         serverSocketChannel = ServerSocketChannel.open();
         selector = Selector.open();
 
@@ -74,9 +76,9 @@ public class EchoServerNio {
             buf.clear();
         }
 
-        String msg = "From server: " + reader.toString();
-        System.out.println("Received: " + msg);
-        channel.write(ByteBuffer.wrap(msg.getBytes(StandardCharsets.UTF_8)));
+        System.out.println("Received: " + reader.toString());
+        StringBuilder msg = new StringBuilder();
+        channel.write(ByteBuffer.wrap(msg.append("-> ").toString().getBytes(StandardCharsets.UTF_8)));
     }
 
     private void handleAccept() throws IOException {
@@ -84,6 +86,7 @@ public class EchoServerNio {
         socketChannel.configureBlocking(false);
         socketChannel.register(selector, SelectionKey.OP_READ);
         System.out.println("Client accepted...");
+        socketChannel.write(ByteBuffer.wrap("Welcome in Mike terminal\nPlease input --help to print command list\n-> ".getBytes(StandardCharsets.UTF_8)));
     }
 
     public static void main(String[] args) throws Exception {
